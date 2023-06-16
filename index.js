@@ -2,8 +2,10 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 require("dotenv").config();
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const stripe = require("stripe")(process.env.PAYMENT_SECRET);
 var jwt = require("jsonwebtoken");
+
 const port = process.env.PORT || 3000;
 const user = process.env.DB_USER;
 const password = process.env.DB_PASS;
@@ -11,6 +13,7 @@ const password = process.env.DB_PASS;
 app.use(cors());
 app.use(express.json());
 
+//JWT middleware
 const verifyJWT = (req, res, next) => {
   const authorization = req.headers.authorization;
   if (!authorization) {
@@ -34,7 +37,6 @@ app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${user}:${password}@atlascluster.rh05iiz.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -53,10 +55,10 @@ async function run() {
 
     //connect with db
 
-    //for instructors collection
-
+    //Connect with database
     const database = client.db("songleMelodyDB");
 
+    //getting all collections
     const userCollection = database.collection("users");
     const instructorsCollection = database.collection("instructors");
     const classesCollection = database.collection("classes");
@@ -118,12 +120,14 @@ async function run() {
       res.send(result);
     });
 
+    //getting users
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
 
       res.send(result);
     });
 
+    //getting users role
     app.get("/role/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
@@ -137,6 +141,7 @@ async function run() {
       res.send(result);
     });
 
+    //updating users role
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
       const role = req.body.userRole;
@@ -148,24 +153,24 @@ async function run() {
     });
 
     //  instructors
+    //getting all instructors
     app.get("/instructors", async (req, res) => {
       const result = await instructorsCollection.find().toArray();
 
       res.send(result);
     });
 
+    //Creating new instructor
     app.post("/instructorClasses", async (req, res) => {
       const body = req.body;
-      //console.log(body);
+
       const result = instructorClassesCollection.insertOne(body);
       res.send(result);
     });
 
+    //updating instructor
     app.patch("/instructorClasses/:id", async (req, res) => {
       const id = req.params.id;
-      //console.log(id);
-      //console.log(req.body.status);
-
       const filter = { _id: new ObjectId(id) };
 
       if (req.body.newInstructorName && req.body.newEmail) {
@@ -226,6 +231,7 @@ async function run() {
       }
     });
 
+    //getting all instructors classes
     app.get("/instructorClasses", verifyJWT, verifyAdmin, async (req, res) => {
       const sort = { _id: -1 };
       const result = await instructorClassesCollection
@@ -235,7 +241,7 @@ async function run() {
       res.send(result);
     });
 
-    //for showing data to instructor by id
+    //for showing data to instructor by email
     app.get(
       "/instructorClasses/:email",
       verifyJWT,
@@ -260,6 +266,8 @@ async function run() {
     );
 
     //classes
+
+    //getting all classes
     app.get("/classes", async (req, res) => {
       const sort = { totalStudents: -1 };
 
@@ -268,19 +276,18 @@ async function run() {
       res.send(result);
     });
 
+    //creating new class
     app.post("/classes", async (req, res) => {
       const body = req.body;
-      //console.log(body);
       const result = await classesCollection.insertOne(body);
       res.send(result);
     });
 
+    //updating seats
     app.put("/classes/:id", async (req, res) => {
       const id = req.params.id;
-      //console.log(id);
+
       const filter = { _id: new ObjectId(id) };
-      //console.log(req.body.remainingSeats);
-      //const availableSeat = req.body.seatsAvailable - 1;
 
       const updateDoc = {
         $set: {
@@ -288,14 +295,14 @@ async function run() {
         },
       };
       const result = await classesCollection.updateOne(filter, updateDoc);
-      //console.log(result);
+
       res.send(result);
     });
 
+    //Payment
     //
     //
-    //
-
+    //creating payment intent
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
@@ -316,6 +323,7 @@ async function run() {
 
     //for selected Class
 
+    //creating selected class
     app.post("/selectedClass", async (req, res) => {
       const body = req.body;
       const result = await selectedClassesCollection.insertOne(body);
@@ -353,11 +361,10 @@ async function run() {
       res.send(result);
     });
 
-    //payment
+    //Creating successful payment
     app.post("/payment", verifyJWT, async (req, res) => {
       const body = req.body;
 
-      //console.log(body);
       const {
         selectedClassId,
         classId,
@@ -397,6 +404,7 @@ async function run() {
       res.send({ insertResult, deleteResult, updateResult });
     });
 
+    //getting all successful payment
     app.get("/payment", verifyJWT, async (req, res) => {
       const result = await paymentCollection.find().toArray();
       res.send(result);
