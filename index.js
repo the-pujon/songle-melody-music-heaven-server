@@ -326,6 +326,7 @@ async function run() {
     //creating selected class
     app.post("/selectedClass", async (req, res) => {
       const body = req.body;
+      console.log(body);
       const result = await selectedClassesCollection.insertOne(body);
       res.send(result);
     });
@@ -369,6 +370,10 @@ async function run() {
         selectedClassId,
         classId,
         instructorId,
+        image,
+        instructorName,
+        price,
+        instrument,
         name,
         email,
         transactionId,
@@ -378,17 +383,36 @@ async function run() {
 
       const insertResult = await paymentCollection.insertOne(body);
 
+      //delete from selected classes
       const queryForDelete = { _id: new ObjectId(selectedClassId) };
       const deleteResult = await selectedClassesCollection.deleteOne(
         queryForDelete
       );
 
+      //update in classes
+      const queryForUpdateClass = { _id: new ObjectId(classId) };
+      const getClass = await classesCollection.findOne(queryForUpdateClass);
+
+      const newTotalStudentInClass = getClass.totalStudents + 1;
+      console.log(newTotalStudentInClass);
+      const updateDocForClass = {
+        $set: {
+          totalStudents: newTotalStudentInClass,
+        },
+      };
+
+      const updateResultClass = await classesCollection.updateOne(
+        queryForUpdateClass,
+        updateDocForClass
+      );
+
+      //update in instructorClasses
       const queryForUpdate = { _id: new ObjectId(instructorId) };
 
-      const getResult = await instructorClassesCollection.findOne(
+      const getResult = await instructorClassesCollection?.findOne(
         queryForUpdate
       );
-      const newTotalStudent = getResult.totalStudents + 1;
+      const newTotalStudent = getResult?.totalStudents + 1;
 
       const updateDoc = {
         $set: {
@@ -401,12 +425,25 @@ async function run() {
         updateDoc
       );
 
-      res.send({ insertResult, deleteResult, updateResult });
+      res.send({ insertResult, deleteResult, updateResult, updateResultClass });
     });
 
     //getting all successful payment
     app.get("/payment", verifyJWT, async (req, res) => {
       const result = await paymentCollection.find().toArray();
+      console.log("payment");
+      res.send(result);
+    });
+
+    app.get("/payment/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      //console.log(email);
+
+      const query = { email: email };
+
+      const result = await paymentCollection.find(query).toArray();
+      console.log(result);
       res.send(result);
     });
 
